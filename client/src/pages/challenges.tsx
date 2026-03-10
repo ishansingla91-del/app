@@ -24,6 +24,7 @@ export default function Challenges() {
         {allChallenges?.map((challenge: any) => {
           const isJoined = joinedChallengeIds.has(challenge.id);
           const userProgress = userChallenges?.find((uc: any) => uc.challengeId === challenge.id);
+          const progress = userProgress?.progress ?? 0;
           
           return (
             <div key={challenge.id} className="glass-panel p-6 rounded-3xl flex flex-col relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
@@ -46,12 +47,12 @@ export default function Challenges() {
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm font-semibold">
                       <span className="text-primary">Progress</span>
-                      <span>{userProgress?.progress} / {challenge.durationDays}</span>
+                      <span>{progress} / {challenge.durationDays}</span>
                     </div>
                     <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-primary to-accent" 
-                        style={{ width: `${(userProgress?.progress / challenge.durationDays) * 100}%` }}
+                        style={{ width: `${(progress / challenge.durationDays) * 100}%` }}
                       />
                     </div>
                     {userProgress?.completed && (

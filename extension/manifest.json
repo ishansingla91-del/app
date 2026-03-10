@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Focus Guard",
+  "version": "1.0.0",
+  "description": "Blocks distracting websites during focus mode and filters YouTube distractions.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://localhost:5000/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["block.html", "block.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

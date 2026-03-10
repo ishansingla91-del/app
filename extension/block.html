@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Blocked by Focus Guard</title>
+    <link rel="stylesheet" href="block.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="card">
+        <h1>Focus Mode Active</h1>
+        <p>This website is blocked during your focus session.</p>
+        <p id="url"></p>
+      </div>
+    </main>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const url = params.get("url");
+      if (url) {
+        document.getElementById("url").textContent = url;
+      }
+    </script>
+  </body>
+</html>

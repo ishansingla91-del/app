@@ -1,27 +1,164 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import type { Server } from "http";
-import { storage } from "./storage";
+import { focusStore, storage } from "./storage";
 import { api } from "@shared/routes";
+import type { AppStats, AppUser, FocusSession } from "@shared/focus";
 import { z } from "zod";
+import { generateFocusTip } from "./services/aiCoach";
 import { verifyYouTubeVideo } from "./services/youtube";
+import { blockedSites } from "./services/blocklist";
+import { isEducationalVideo, scoreYoutubeTitle } from "./services/youtubeFilter";
 import path from "path";
 import archiver from "archiver";
+
+function sendInternalError(res: Response, error: unknown) {
+  console.error(error);
+  return res.status(500).json({
+    success: false,
+    error: "Internal server error",
+  });
+}
+
+export function registerFocusRoutes(app: Express) {
+  app.get("/api/focus/status", (_req, res) => {
+    try {
+      res.json(focusStore.getFocusStatus());
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
+  app.post("/api/focus/start", async (req, res) => {
+    try {
+      const durationSecondsRaw = Number(req.body?.durationSeconds);
+      const durationSeconds =
+        Number.isFinite(durationSecondsRaw) && durationSecondsRaw > 0
+          ? durationSecondsRaw
+          : 25 * 60;
+
+      const session = focusStore.startSession(durationSeconds);
+
+      // Keep DB session tracking in sync with focus-mode lifecycle.
+      try {
+        await storage.createSession({
+          userId: 1,
+          durationMinutes: Math.max(1, Math.ceil(durationSeconds / 60)),
+          completed: false,
+        });
+      } catch (error) {
+        console.error("Focus start DB sync failed:", error);
+      }
+
+      res.json({
+        success: true,
+        session,
+      });
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
+  app.post("/api/focus/end", async (_req, res) => {
+    try {
+      const session = focusStore.endSession();
+
+      // Mark latest open DB session as completed for dashboard/history consistency.
+      try {
+        const sessions = await storage.getSessionsByUser(1);
+        const latestOpen = sessions
+          .filter((s) => !s.completed)
+          .sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          })[0];
+
+        if (latestOpen) {
+          await storage.updateSession(latestOpen.id, { completed: true });
+        }
+      } catch (error) {
+        console.error("Focus end DB sync failed:", error);
+      }
+
+      res.json({
+        success: true,
+        session,
+      });
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  registerFocusRoutes(app);
+
+  app.get("/api/user", async (_req, res) => {
+    try {
+      const user = await storage.getUser(1);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const payload: AppUser = {
+        id: user.id,
+        name: user.username,
+        streak: user.streak,
+      };
+
+      return res.json(payload);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
+  app.get("/api/sessions", async (_req, res) => {
+    try {
+      const sessions = await storage.getSessionsByUser(1);
+
+      const payload: FocusSession[] = sessions.map((session) => {
+        const start = session.createdAt
+          ? new Date(session.createdAt).getTime()
+          : Date.now();
+        const durationSeconds = session.durationMinutes * 60;
+        const end = session.completed ? start + durationSeconds * 1000 : null;
+
+        return {
+          id: String(session.id),
+          start,
+          end,
+          durationSeconds,
+          completed: session.completed,
+          mode: "focus",
+        };
+      });
+
+      return res.json(payload);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
   // Users
   // Register the static leaderboard route before :id to avoid shadowing.
   app.get(api.users.leaderboard.path, async (_req, res) => {
-    const users = await storage.getLeaderboard();
-    res.json(users);
+    try {
+      const users = await storage.getLeaderboard();
+      res.json(users);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
   });
 
   app.get(api.users.get.path, async (req, res) => {
-    const user = await storage.getUser(Number(req.params.id));
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+    try {
+      const user = await storage.getUser(Number(req.params.id));
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
   });
 
   app.put(api.users.update.path, async (req, res) => {
@@ -40,8 +177,12 @@ export async function registerRoutes(
 
   // Sessions
   app.get(api.sessions.list.path, async (req, res) => {
-    const sessions = await storage.getSessionsByUser(Number(req.params.userId));
-    res.json(sessions);
+    try {
+      const sessions = await storage.getSessionsByUser(Number(req.params.userId));
+      res.json(sessions);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
   });
 
   app.post(api.sessions.create.path, async (req, res) => {
@@ -73,14 +214,22 @@ export async function registerRoutes(
 
   // Challenges
   app.get(api.challenges.list.path, async (req, res) => {
-    const challenges = await storage.getChallenges();
-    res.json(challenges);
+    try {
+      const challenges = await storage.getChallenges();
+      res.json(challenges);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
   });
 
   // User Challenges
   app.get(api.userChallenges.list.path, async (req, res) => {
-    const userChallenges = await storage.getUserChallenges(Number(req.params.userId));
-    res.json(userChallenges);
+    try {
+      const userChallenges = await storage.getUserChallenges(Number(req.params.userId));
+      res.json(userChallenges);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
   });
 
   app.post(api.userChallenges.create.path, async (req, res) => {
@@ -112,8 +261,12 @@ export async function registerRoutes(
 
   // Focus Rooms
   app.get(api.rooms.list.path, async (req, res) => {
-    const rooms = await storage.getRooms();
-    res.json(rooms);
+    try {
+      const rooms = await storage.getRooms();
+      res.json(rooms);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
   });
 
   app.post(api.rooms.create.path, async (req, res) => {
@@ -163,9 +316,13 @@ export async function registerRoutes(
 
   // Settings
   app.get(api.settings.get.path, async (req, res) => {
-    const settings = await storage.getSettings(Number(req.params.userId));
-    if (!settings) return res.status(404).json({ message: "Settings not found" });
-    res.json(settings);
+    try {
+      const settings = await storage.getSettings(Number(req.params.userId));
+      if (!settings) return res.status(404).json({ message: "Settings not found" });
+      res.json(settings);
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
   });
 
   app.put(api.settings.update.path, async (req, res) => {
@@ -205,6 +362,68 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/youtube/classify", (req, res) => {
+    try {
+      const title = String(req.body?.title ?? "").trim();
+
+      if (!title) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing title",
+        });
+      }
+
+      const score = scoreYoutubeTitle(title);
+      const educational = isEducationalVideo(title);
+
+      res.json({
+        success: true,
+        title,
+        educational,
+        score,
+      });
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
+  app.get("/api/blocklist", (_req, res) => {
+    try {
+      res.json({
+        blocked: blockedSites,
+      });
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
+  app.get("/api/extension/status", (_req, res) => {
+    try {
+      res.json({
+        focus: focusStore.getFocusStatus(),
+        blocklistVersion: 1,
+        blocked: blockedSites,
+      });
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
+  app.get("/api/ai/focus-tip", (_req, res) => {
+    try {
+      const stats = focusStore.getStats();
+
+      res.json({
+        tip: generateFocusTip({
+          active: stats.active,
+          sessionsToday: stats.sessions,
+        }),
+      });
+    } catch (error) {
+      return sendInternalError(res, error);
+    }
+  });
+
   // Stats
   app.get("/api/stats", async (req, res) => {
     try {
@@ -212,12 +431,30 @@ export async function registerRoutes(
       const sessions = await storage.getSessionsByUser(userId);
       const completed = sessions.filter((s) => s.completed);
       const minutes = completed.reduce((sum, s) => sum + s.durationMinutes, 0);
-      
-      res.json({
-        totalSessions: sessions.length,
-        completedSessions: completed.length,
-        focusMinutes: minutes,
+      const now = new Date();
+      const active = sessions.some((session) => {
+        if (session.completed || !session.createdAt) return false;
+        const createdAt = new Date(session.createdAt);
+        const endsAt = new Date(
+          createdAt.getTime() + session.durationMinutes * 60000,
+        );
+        return now < endsAt;
       });
+
+      const payload: AppStats & {
+        totalSessions: number;
+        focusMinutes: number;
+      } = {
+        sessions: sessions.length,
+        totalFocusSeconds: minutes * 60,
+        completedSessions: completed.length,
+        active,
+        // Legacy fields kept for current dashboard compatibility.
+        totalSessions: sessions.length,
+        focusMinutes: minutes,
+      };
+      
+      res.json(payload);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Failed to fetch stats" });

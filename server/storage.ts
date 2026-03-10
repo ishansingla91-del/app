@@ -1,4 +1,5 @@
 import { db } from "./db";
+import crypto from "crypto";
 import {
   users, focusSessions, challenges, userChallenges, focusRooms, roomParticipants, settings,
   type InsertUser, type InsertFocusSession, type InsertChallenge, type InsertUserChallenge,
@@ -6,7 +7,8 @@ import {
   type User, type FocusSession, type Challenge, type UserChallenge,
   type FocusRoom, type RoomParticipant, type Settings
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import type { FocusSession as SharedFocusSession } from "@shared/focus";
+import { and, eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -153,7 +155,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async leaveRoom(roomId: number, userId: number): Promise<boolean> {
-    const result = await db.delete(roomParticipants).where(eq(roomParticipants.roomId, roomId)).where(eq(roomParticipants.userId, userId)).returning();
+    const result = await db
+      .delete(roomParticipants)
+      .where(and(eq(roomParticipants.roomId, roomId), eq(roomParticipants.userId, userId)))
+      .returning();
     return result.length > 0;
   }
 
@@ -179,3 +184,85 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+class InMemoryFocusStore {
+  private sessions: SharedFocusSession[] = [];
+  private activeSessionId: string | null = null;
+
+  getUser() {
+    return {
+      id: 1,
+      name: "Focus User",
+      streak: this.getStreak(),
+    };
+  }
+
+  getSessions() {
+    return this.sessions.slice().sort((a, b) => b.start - a.start);
+  }
+
+  getStats() {
+    const sessions = this.getSessions();
+    const totalFocusSeconds = sessions.reduce(
+      (sum, session) => sum + session.durationSeconds,
+      0,
+    );
+    const completedSessions = sessions.filter((s) => s.completed).length;
+
+    return {
+      sessions: sessions.length,
+      totalFocusSeconds,
+      completedSessions,
+      active: Boolean(this.activeSessionId),
+    };
+  }
+
+  startSession(durationSeconds: number) {
+    if (this.activeSessionId) {
+      const existing = this.sessions.find((s) => s.id === this.activeSessionId);
+      if (existing) return existing;
+    }
+
+    const session: SharedFocusSession = {
+      id: crypto.randomUUID(),
+      start: Date.now(),
+      end: null,
+      durationSeconds,
+      completed: false,
+      mode: "focus",
+    };
+
+    this.sessions.push(session);
+    this.activeSessionId = session.id;
+    return session;
+  }
+
+  endSession() {
+    if (!this.activeSessionId) return null;
+
+    const session = this.sessions.find((s) => s.id === this.activeSessionId);
+    if (!session) {
+      this.activeSessionId = null;
+      return null;
+    }
+
+    session.end = Date.now();
+    session.completed = true;
+    this.activeSessionId = null;
+    return session;
+  }
+
+  getFocusStatus() {
+    return {
+      active: Boolean(this.activeSessionId),
+      activeSessionId: this.activeSessionId,
+    };
+  }
+
+  private getStreak() {
+    const completed = this.sessions.filter((s) => s.completed);
+    return completed.length;
+  }
+}
+
+export const focusStore = new InMemoryFocusStore();

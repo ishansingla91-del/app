@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import YouTube from "react-youtube";
 import { useLocation } from "wouter";
 import {
@@ -14,22 +14,32 @@ import {
   Info,
 } from "lucide-react";
 import { useYouTubeFilter } from "@/hooks/use-youtube";
-import { useCreateSession, useUpdateSession } from "@/hooks/use-sessions";
 import { useSettings } from "@/hooks/use-settings";
+import { useFocusTimer } from "@/hooks/useFocusTimer";
 
 type TimerState = "idle" | "running" | "paused" | "blocked" | "success";
 
 export default function FocusMode() {
   const [, setLocation] = useLocation();
   const { checkVideo, isChecking } = useYouTubeFilter();
-  const createSession = useCreateSession();
-  const updateSession = useUpdateSession();
   const { data: settings } = useSettings();
+  const {
+    secondsLeft: timeLeft,
+    formatted,
+    startFocus,
+    stopFocus,
+    resetFocus,
+    pauseFocus,
+    resumeFocus,
+  } = useFocusTimer({
+    onComplete: () => {
+      setTimerState("success");
+    },
+  });
 
   const [duration, setDuration] = useState(30);
   const [customMinutes, setCustomMinutes] = useState(30);
   const [customHours, setCustomHours] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30 * 60);
 
   const [timerState, setTimerState] = useState<TimerState>("idle");
 
@@ -37,62 +47,23 @@ export default function FocusMode() {
   const [videoId, setVideoId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showExtensionInfo, setShowExtensionInfo] = useState(true);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
-
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (settings?.defaultDuration) {
       setDuration(settings.defaultDuration);
       setCustomMinutes(settings.defaultDuration);
-      setTimeLeft(settings.defaultDuration * 60);
+      resetFocus(settings.defaultDuration * 60);
     }
-  }, [settings]);
-
-  useEffect(() => {
-    if (timerState !== "running") {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      return;
-    }
-
-    intervalRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-          }
-          void handleComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [timerState]);
+  }, [settings, resetFocus]);
 
   async function startTimer() {
     const totalMinutes = customHours * 60 + customMinutes;
     const safeMinutes = Math.max(5, Math.min(24 * 60, totalMinutes || duration));
     setDuration(safeMinutes);
-    setTimeLeft(safeMinutes * 60);
     setError("");
 
     try {
-      const session = await createSession.mutateAsync({
-        durationMinutes: safeMinutes,
-        completed: false,
-      });
-      setCurrentSessionId(session.id);
+      await startFocus(safeMinutes * 60);
       setTimerState("running");
     } catch (err) {
       console.error(err);
@@ -102,34 +73,23 @@ export default function FocusMode() {
   }
 
   function pauseTimer() {
+    pauseFocus();
     setTimerState("paused");
   }
 
   function resumeTimer() {
+    resumeFocus();
     setTimerState("running");
   }
 
-  async function handleComplete() {
+  async function stopTimer() {
     try {
-      if (currentSessionId) {
-        await updateSession.mutateAsync({
-          id: currentSessionId,
-          completed: true,
-        });
-      }
-      setTimerState("success");
-      setCurrentSessionId(null);
+      await stopFocus();
     } catch (err) {
       console.error(err);
-      setError("Could not complete session");
-      setTimerState("blocked");
     }
-  }
-
-  async function stopTimer() {
     setTimerState("blocked");
     setError("Focus session stopped early");
-    setCurrentSessionId(null);
   }
 
   async function handleVideoSubmit(e: React.FormEvent) {
@@ -146,13 +106,6 @@ export default function FocusMode() {
       setTimerState("blocked");
       setError(result.reason || "Video blocked");
     }
-  }
-
-  function formatTime(seconds: number) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }
 
   const progress = duration > 0 ? ((duration * 60 - timeLeft) / (duration * 60)) * 100 : 0;
@@ -215,7 +168,7 @@ export default function FocusMode() {
 
         <div className="relative z-10">
           <div className="text-6xl md:text-7xl font-display font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-pulse-glow">
-            {formatTime(timeLeft)}
+            {formatted}
           </div>
           <div className="w-full max-w-md mx-auto mt-6 h-3 bg-black/30 rounded-full overflow-hidden">
             <div

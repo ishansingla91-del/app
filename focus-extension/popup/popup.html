@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Planner AI - Focus Mode</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h1>Study Planner AI</h1>
+      </div>
+    </div>
+
+    <!-- Status Section -->
+    <div class="status-section">
+      <div class="status-indicator" id="statusIndicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span class="status-text" id="statusText">Checking...</span>
+      </div>
+      
+      <div class="time-remaining" id="timeRemaining" style="display: none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 6V12L16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span id="timeText">--:--</span>
+      </div>
+    </div>
+
+    <!-- Info Section -->
+    <div class="info-section" id="infoSection">
+      <p class="info-text" id="infoText">
+        Focus mode syncs with your Study Planner dashboard.
+      </p>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-primary" id="dashboardBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+          <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+          <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+          <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Open Dashboard
+      </button>
+      
+      <button class="btn btn-secondary" id="refreshBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21.5 2V8H15.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2.5 22V16H8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19.13 8C18.1 5.5 15.7 3.7 12.9 3.5C8.5 3.2 4.7 6.5 4.2 10.9C3.7 15.7 7.3 19.8 12 20C15.3 20.1 18.1 18.2 19.4 15.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Refresh Status
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Extension v1.0.0</p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

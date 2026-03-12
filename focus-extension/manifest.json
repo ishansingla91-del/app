@@ -1,34 +1,85 @@
 {
   "manifest_version": 3,
-  "name": "Study Planner AI - Focus Mode",
-  "version": "1.0.0",
-  "description": "Block distracting websites during focus sessions. Sync with Study Planner AI.",
+  "name": "Focus Guard",
+  "version": "2.1.0",
+  "description": "Strict focus blocker with educational-only YouTube mode, PIN controls, and anti-bypass safeguards.",
   "permissions": [
     "storage",
     "tabs",
-    "webNavigation",
-    "alarms"
+    "alarms",
+    "notifications",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "*://*.youtube.com/*",
+    "*://youtube.com/*",
+    "*://*.instagram.com/*",
+    "*://*.facebook.com/*",
+    "*://*.reddit.com/*",
+    "*://*.x.com/*",
+    "*://*.twitter.com/*",
+    "*://*.tiktok.com/*",
+    "*://*.twitch.tv/*",
+    "*://*.discord.com/*",
+    "*://*.netflix.com/*",
+    "*://*.primevideo.com/*",
+    "http://localhost:5000/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
-  "action": {
-    "default_popup": "popup/popup.html",
-    "default_icon": "icon.svg"
-  },
-  "icons": {
-    "16": "icon.svg",
-    "48": "icon.svg",
-    "128": "icon.svg"
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "focus_blocking_rules",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
   },
   "content_scripts": [
     {
-      "matches": ["https://*.youtube.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://youtube.com/*"
+      ],
+      "js": [
+        "content.js",
+        "youtube-filter.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "*://*.instagram.com/*",
+        "*://*.facebook.com/*",
+        "*://*.reddit.com/*",
+        "*://*.x.com/*",
+        "*://*.twitter.com/*",
+        "*://*.tiktok.com/*",
+        "*://*.twitch.tv/*",
+        "*://*.discord.com/*",
+        "*://*.netflix.com/*",
+        "*://*.primevideo.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "block.html",
+        "block.css",
+        "block.js",
+        "keywords.json",
+        "channels.json"
+      ],
+      "matches": ["<all_urls>"]
     }
   ]
 }

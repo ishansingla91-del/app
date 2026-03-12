@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Focus Mode Active</title>
+    <link rel="stylesheet" href="block.css" />
+  </head>
+  <body>
+    <main class="block-layout">
+      <section class="card">
+        <p class="eyebrow">Focus Guardian</p>
+        <h1>Focus Mode Active — Return to Study</h1>
+        <p class="description">
+          Distracting content is blocked while your session is running.
+        </p>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="label">Blocked Source</span>
+            <strong id="sourceValue">Loading...</strong>
+          </div>
+          <div class="stat">
+            <span class="label">Study Goal</span>
+            <strong id="goalValue">Loading...</strong>
+          </div>
+          <div class="stat">
+            <span class="label">Time Remaining</span>
+            <strong id="timerValue">--:--:--</strong>
+          </div>
+        </div>
+
+        <form id="unlockForm" autocomplete="off">
+          <label for="adminPin">Admin PIN to end session early</label>
+          <div class="pin-row">
+            <input id="adminPin" name="adminPin" type="password" inputmode="numeric" minlength="4" required />
+            <button type="submit">End Session</button>
+          </div>
+        </form>
+
+        <details id="timeSettings" style="margin-top:12px;">
+          <summary style="cursor:pointer;color:#9eb6cc;">Change Focus Time</summary>
+          <form id="focusTimeForm" autocomplete="off" style="margin-top:10px;">
+            <div class="pin-row" style="margin-bottom:8px;">
+              <input id="focusMinutes" type="number" min="15" max="720" step="5" placeholder="Duration (15-720 min)" required />
+              <input id="focusPin" type="password" inputmode="numeric" minlength="4" placeholder="Admin PIN" required />
+            </div>
+            <button type="submit">Update Time</button>
+          </form>
+        </details>
+
+        <details id="pinSettings" style="margin-top:14px;">
+          <summary style="cursor:pointer;color:#9eb6cc;">Change Admin PIN</summary>
+          <form id="changePinForm" autocomplete="off" style="margin-top:10px;">
+            <div class="pin-row" style="margin-bottom:8px;">
+              <input id="currentPin" type="password" inputmode="numeric" minlength="4" placeholder="Current PIN" required />
+              <input id="newPin" type="password" inputmode="numeric" minlength="4" maxlength="8" placeholder="New PIN (4-8 digits)" required />
+            </div>
+            <button type="submit">Update PIN</button>
+          </form>
+        </details>
+
+        <p class="status-message" id="statusMessage"></p>
+      </section>
+    </main>
+    <script src="block.js"></script>
+  </body>
+</html>
